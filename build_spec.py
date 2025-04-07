@@ -40,6 +40,5 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,  # 如果不需要控制台窗口，设置为False
-    icon='static/icon.ico'  # 如果你有图标文件的话
+    console=True  # 如果不需要控制台窗口，设置为False
 )

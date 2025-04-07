@@ -19,7 +19,6 @@ RUN wine pyinstaller --clean \
     --hidden-import openpyxl \
     --hidden-import numpy \
     --name "Excel处理工具" \
-    --icon=static/icon.ico \
     --noconsole \
     --onefile \
     app.py
