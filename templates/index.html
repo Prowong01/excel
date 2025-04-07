@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel 处理工具</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Excel 处理工具</h1>
+        
+        <div class="upload-area" id="dropZone">
+            <div class="upload-text">
+                拖放文件到这里或点击选择文件
+                <br>
+                <small>(支持 .xlsx 和 .csv 文件)</small>
+            </div>
+            <input type="file" id="fileInput" multiple accept=".xlsx,.csv" style="display: none;">
+        </div>
+
+        <div class="file-list" id="fileList"></div>
+
+        <button id="processButton" class="button" disabled>处理文件</button>
+
+        <div id="progressArea" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress" id="progressBar"></div>
+            </div>
+            <div id="progressText">处理中...</div>
+        </div>
+
+        <div id="resultArea" style="display: none;">
+            <div id="resultMessage"></div>
+            <button id="downloadButton" class="button">下载处理后的文件</button>
+        </div>
+
+        <div class="compare-section">
+            <h2>文件比较</h2>
+            <div class="compare-form">
+                <div class="file-input">
+                    <label>文件1 (较旧):</label>
+                    <input type="file" id="file1" accept=".xlsx,.csv">
+                </div>
+                <div class="file-input">
+                    <label>文件2 (较新):</label>
+                    <input type="file" id="file2" accept=".xlsx,.csv">
+                </div>
+                <button id="compareButton">比较文件</button>
+            </div>
+            <div id="compareProgress" style="display: none;">
+                <div class="progress-bar"></div>
+            </div>
+            <div id="compareResult" style="display: none;">
+                <p id="compareMessage"></p>
+                <button id="downloadComparisonButton" style="display: none;">下载比较结果</button>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

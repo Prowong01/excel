@@ -1,0 +1,25 @@
+FROM --platform=linux/amd64 cdrx/pyinstaller-windows
+
+# 启用 QEMU 支持
+RUN apt-get update && apt-get install -y qemu-user-static
+
+# 复制项目文件
+COPY . /src/
+WORKDIR /src
+
+# 安装依赖
+RUN wine pip install -r requirements.txt
+
+# 打包应用
+RUN wine pyinstaller --clean \
+    --add-data "templates;templates" \
+    --add-data "static;static" \
+    --hidden-import webview \
+    --hidden-import pandas \
+    --hidden-import openpyxl \
+    --hidden-import numpy \
+    --name "Excel处理工具" \
+    --icon=static/icon.ico \
+    --noconsole \
+    --onefile \
+    app.py
