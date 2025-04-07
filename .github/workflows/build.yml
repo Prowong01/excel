@@ -28,7 +28,7 @@ jobs:
             --hidden-import pandas `
             --hidden-import openpyxl `
             --hidden-import numpy `
-            --name "Excel处理工具" `
+            --name "ExcelProcessor" `
             --noconsole `
             --onefile `
             app.py
@@ -36,5 +36,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Excel处理工具-Windows
-          path: dist/Excel处理工具.exe
+          name: excel-processor-windows
+          path: dist/ExcelProcessor.exe
