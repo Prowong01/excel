@@ -6,9 +6,9 @@ import sys
 
 def compare_excel_files(file1_path, file2_path):
     try:
-        # 读取两个文件
-        df1 = pd.read_excel(file1_path)
-        df2 = pd.read_excel(file2_path)
+        # 使用 utf-8 编码读取 Excel 文件
+        df1 = pd.read_excel(file1_path, engine='openpyxl')
+        df2 = pd.read_excel(file2_path, engine='openpyxl')
         
         print(f"文件1行数: {len(df1)}")
         print(f"文件2行数: {len(df2)}")

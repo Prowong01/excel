@@ -5,12 +5,11 @@ import webview
 import threading
 import tempfile
 from main import process_excel
-from compare_excel import compare_excel_files  # 添加导入
+from compare_excel import compare_excel_files
 import pandas as pd
 from datetime import datetime
 
 def get_resource_path(relative_path):
-    """获取资源文件的绝对路径"""
     try:
         # PyInstaller创建临时文件夹，将路径存储在_MEIPASS中
         base_path = sys._MEIPASS
@@ -24,10 +23,10 @@ app = Flask(__name__,
     static_folder=get_resource_path('static')
 )
 
-# 使用应用程序特定的临时目录
+# 使用系统临时目录
 UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'excel_processor_uploads')
 PROCESSED_FOLDER = os.path.join(tempfile.gettempdir(), 'excel_processor_processed')
-COMPARE_FOLDER = os.path.join(tempfile.gettempdir(), 'excel_processor_compare')  # 新增比较文件夹
+COMPARE_FOLDER = os.path.join(tempfile.gettempdir(), 'excel_processor_compare')
 
 # 确保目录存在
 for folder in [UPLOAD_FOLDER, PROCESSED_FOLDER, COMPARE_FOLDER]:
@@ -47,24 +46,27 @@ def upload_file():
         return jsonify({'error': '没有选择文件'}), 400
 
     try:
-        # Clear temporary folders
+        # 清理临时文件夹
         for folder in [UPLOAD_FOLDER, PROCESSED_FOLDER]:
             for filename in os.listdir(folder):
                 file_path = os.path.join(folder, filename)
                 try:
-                    os.remove(file_path)
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
                 except Exception as e:
                     print(f"Error removing file {file_path}: {e}")
 
-        # Save uploaded files
+        # 保存上传的文件
         saved_files = []
         for file in files:
             if file.filename:
-                filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+                # 使用安全的文件名
+                safe_filename = os.path.basename(file.filename)
+                filepath = os.path.join(UPLOAD_FOLDER, safe_filename)
                 file.save(filepath)
                 saved_files.append(filepath)
 
-        # Process files
+        # 处理文件
         all_data = []
         for file_path in saved_files:
             processed_df = process_excel(file_path)
@@ -72,12 +74,12 @@ def upload_file():
                 all_data.append(processed_df)
 
         if all_data:
-            # Merge all data
+            # 合并所有数据
             final_df = pd.concat(all_data, ignore_index=True)
             
-            # Save processed file
+            # 保存处理后的文件
             output_path = os.path.join(PROCESSED_FOLDER, 'processed_data.xlsx')
-            final_df.to_excel(output_path, index=False)
+            final_df.to_excel(output_path, index=False, engine='openpyxl')
             
             return jsonify({
                 'success': True,
@@ -98,11 +100,15 @@ def upload_file():
 def download():
     output_path = os.path.join(PROCESSED_FOLDER, 'processed_data.xlsx')
     if os.path.exists(output_path):
-        return send_file(
-            output_path,
-            as_attachment=True,
-            download_name='processed_data.xlsx'
-        )
+        try:
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name='processed_data.xlsx',
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        except Exception as e:
+            return jsonify({'error': f'下载文件时出错: {str(e)}'}), 500
     return jsonify({'error': '文件不存在'}), 404
 
 @app.route('/compare', methods=['POST'])
@@ -121,11 +127,12 @@ def compare_files():
         for filename in os.listdir(COMPARE_FOLDER):
             file_path = os.path.join(COMPARE_FOLDER, filename)
             try:
-                os.remove(file_path)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
             except Exception as e:
                 print(f"清理文件失败 {file_path}: {e}")
 
-        # 保存上传的文件
+        # 保存上传的文件，使用安全的文件名
         file1_path = os.path.join(COMPARE_FOLDER, 'file1.xlsx')
         file2_path = os.path.join(COMPARE_FOLDER, 'file2.xlsx')
         
@@ -136,11 +143,10 @@ def compare_files():
         merged_df, calc_df = compare_excel_files(file1_path, file2_path)
         
         if merged_df is not None and calc_df is not None:
-            # 生成输出文件名
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = os.path.join(COMPARE_FOLDER, f"compared_data_{timestamp}.xlsx")
             
-            # 保存结果
+            # 使用 openpyxl 引擎保存 Excel
             with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
                 merged_df.to_excel(writer, sheet_name='Data', index=False)
                 calc_df.to_excel(writer, sheet_name='Calculation', index=False)
@@ -167,11 +173,15 @@ def download_comparison(timestamp):
     file_path = os.path.join(COMPARE_FOLDER, filename)
     
     if os.path.exists(file_path):
-        return send_file(
-            file_path,
-            as_attachment=True,
-            download_name=filename
-        )
+        try:
+            return send_file(
+                file_path,
+                as_attachment=True,
+                download_name=filename,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        except Exception as e:
+            return jsonify({'error': f'下载文件时出错: {str(e)}'}), 500
     return jsonify({'error': '比较结果文件不存在'}), 404
 
 def start_server():
