@@ -92,8 +92,7 @@ def determine_game_label(post):
         "PUBG": ["pubg", "吃鸡", "绝地求生", "和平精英","游戏小剧场"],
         "Warframe": ["warframe", "星际战甲"],
         "P2": ["exoborne"],
-        "Dyinglight": ["消逝的光芒", "消光", "拉万", "lawan", "克兰", "clane", 
-                      "消失的光芒", "dyinglight", "dying light"],
+        "Dyinglight": ["消逝的光芒", "消光", "拉万", "lawan", "克兰", "clane", "消失的光芒", "dyinglight", "dying light"],
         "Nikke": ["nikke", "妮姬"],
         "英雄联盟": ["leagueoflegends", "lol", "英雄联盟"],
         "王者荣耀": ["王者荣耀", "hok", "honor of kings", "honorofkings"],
@@ -132,7 +131,6 @@ def process_excel(file_path):
         print(f"成功读取文件，行数: {len(df)}")
         
         # 打印列名用于调试
-        print(f"原始列名: {df.columns.tolist()}")
         
         # 清理列名
         df.columns = (
@@ -192,15 +190,19 @@ def process_excel(file_path):
                     # 处理中文格式日期
                     if '年' in date_str and '月' in date_str and '日' in date_str:
                         # 提取年月日
-                        match = re.search(r'(\d{4})年(\d{2})月(\d{2})日', date_str)
+                        match = re.search(r'(\d{4})年(\d{2})月(\d{2})日\s*(\d{2})?:?(\d{2})?:?(\d{2})?', date_str)
                         if match:
-                            year, month, day = match.groups()
-                            return f"{year}-{month}-{day}"
+                            year, month, day, hours, minutes, seconds = match.groups()
+                            # 如果时分秒为None，设置为00
+                            hours = hours or "00"
+                            minutes = minutes or "00"
+                            seconds = seconds or "00"
+                            return f"{year}-{month}-{day}_{hours}:{minutes}:{seconds}"
                     
                     # 尝试用pandas处理其他格式
                     parsed_date = pd.to_datetime(date_str, errors='coerce')
                     if pd.notna(parsed_date):
-                        return parsed_date.strftime('%Y-%m-%d')
+                        return parsed_date.strftime('%Y-%m-%d_%H:%M:%S')
                     
                     return date_str
                 except Exception as e:
@@ -208,7 +210,6 @@ def process_excel(file_path):
                     return date_val
 
             df['published_date'] = df['published_date'].apply(convert_date)
-            print("统一 published_date 格式完成")
 
         # 生成network字段
         if is_foreign:
@@ -247,7 +248,6 @@ def process_excel(file_path):
                 df['post_id'] = df[post_id_cols[0]].astype(str).str.strip()
             else:
                 print("警告：国外数据缺少post_id列，将自动生成")
-                # 生成逻辑（仅应急情况）...
         else:
             # 否则生成post_id
             print("生成post_id")

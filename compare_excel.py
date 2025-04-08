@@ -7,11 +7,11 @@ import sys
 def compare_excel_files(file1_path, file2_path):
     try:
         # 使用 utf-8 编码读取 Excel 文件
-        df1 = pd.read_excel(file1_path, engine='openpyxl')
-        df2 = pd.read_excel(file2_path, engine='openpyxl')
+        df1 = pd.read_excel(file1_path, engine='openpyxl')  # 旧文件
+        df2 = pd.read_excel(file2_path, engine='openpyxl')  # 新文件
         
-        print(f"文件1行数: {len(df1)}")
-        print(f"文件2行数: {len(df2)}")
+        print(f"文件1(旧)行数: {len(df1)}")
+        print(f"文件2(新)行数: {len(df2)}")
         
         # 确保两个DataFrame都有必要的列
         required_cols = ['post_id', 'video_views']
@@ -19,33 +19,61 @@ def compare_excel_files(file1_path, file2_path):
             if col not in df1.columns or col not in df2.columns:
                 raise ValueError(f"缺少必要的列: {col}")
         
-        # 将df2的相关列重命名，以避免合并时的冲突
-        df2 = df2.rename(columns={'video_views': 'video_views_new'})
+        # 获取两个DataFrame中的所有数值列
+        numeric_cols = ['video_views', 'like', 'comment', 'share', 'collect', 'subscribers']
+        available_numeric_cols = [col for col in numeric_cols if col in df1.columns and col in df2.columns]
         
-        # 基于post_id合并两个DataFrame
+        # 将df1(旧文件)的相关列重命名，以避免合并时的冲突
+        rename_dict = {col: f'{col}_old' for col in available_numeric_cols}
+        df1 = df1.rename(columns=rename_dict)
+        
+        # 准备要合并的列
+        merge_cols = ['post_id'] + [f'{col}_old' for col in available_numeric_cols]
+        
+        # 基于post_id合并两个DataFrame，以新文件(df2)为基准
         merged_df = pd.merge(
-            df1, 
-            df2[['post_id', 'video_views_new']], 
+            df2,  # 新文件作为基准
+            df1[merge_cols],  # 旧文件的数据
             on='post_id', 
-            how='left'
+            how='left'  # 保留所有新文件的记录
         )
         
-        # 计算差异
-        merged_df['videoviews_difference'] = merged_df['video_views_new'] - merged_df['video_views']
-        merged_df['videoviews_difference'] = merged_df['videoviews_difference'].fillna(0)
+        # 计算所有数值列的差异（新 - 旧）
+        for col in available_numeric_cols:
+            merged_df[f'{col}_difference'] = merged_df[col].fillna(0) - merged_df[f'{col}_old'].fillna(0)
         
-        # 创建计算统计数据 - 只包含 post_count 相关统计
+        # 创建计算统计数据
+        metrics = []
+        values = []
+        
+        # 添加基础统计
+        metrics.extend([
+            'post_count (old)',
+            'post_count (new)',
+            'post_count_difference'
+        ])
+        values.extend([
+            len(df1),
+            len(df2),
+            len(df2) - len(df1)
+        ])
+        
+        # 添加每个数值列的统计
+        for col in available_numeric_cols:
+            metrics.extend([
+                f'total_{col} (old)',
+                f'total_{col} (new)',
+                f'total_{col}_difference'
+            ])
+            values.extend([
+                df1[f'{col}_old'].fillna(0).sum(),
+                df2[col].fillna(0).sum(),
+                df2[col].fillna(0).sum() - df1[f'{col}_old'].fillna(0).sum()
+            ])
+        
         calc_data = {
-            'Metrics': [
-                'post_count (old)',
-                'post_count (new)',
-                'post_count_difference'
-            ],
-            'Values': [
-                len(df1),  # post_count (old)
-                len(df2),  # post_count (new)
-                len(df2) - len(df1)  # post_count_difference
-            ]
+            'Metrics': metrics,
+            'Values': values
         }
         
         calc_df = pd.DataFrame(calc_data)
@@ -65,10 +93,11 @@ def compare_excel_files(file1_path, file2_path):
         print(f"比较完成！输出文件：{output_path}")
         
         # 打印统计信息
-        matched_count = len(merged_df[merged_df['video_views_new'].notna()])
+        matched_count = len(merged_df[merged_df[f'{available_numeric_cols[0]}_old'].notna()])
+        unmatched_count = len(merged_df) - matched_count
         print(f"\n统计信息:")
         print(f"匹配的post_id数量: {matched_count}")
-        print(f"未匹配的post_id数量: {len(merged_df) - matched_count}")
+        print(f"未匹配的post_id数量: {unmatched_count}")
         print(f"帖子数量变化: {len(df2) - len(df1):,}")
         
         return merged_df, calc_df
