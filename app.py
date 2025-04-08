@@ -77,6 +77,37 @@ def upload_file():
             # 合并所有数据
             final_df = pd.concat(all_data, ignore_index=True)
             
+            # 检查并处理重复的post_id
+            if 'post_id' in final_df.columns:
+                duplicate_mask = final_df['post_id'].duplicated(keep=False)
+                duplicates = final_df[duplicate_mask]
+                
+                if not duplicates.empty:
+                    print(f"发现{len(duplicates)}行重复的post_id，进行合并处理")
+                    
+                    # 定义需要合并的数值列
+                    numeric_cols = ['video_views', 'like', 'comment', 'share', 'collect']
+                    # 只使用存在的列
+                    numeric_cols = [col for col in numeric_cols if col in final_df.columns]
+                    
+                    # 保留第一次出现的记录
+                    unique_records = final_df[~final_df['post_id'].duplicated(keep='first')]
+                    # 获取重复的记录（不包括第一次出现的）
+                    duplicate_records = final_df[final_df['post_id'].duplicated(keep='first')]
+                    
+                    # 对重复记录按post_id分组并求和
+                    if numeric_cols:
+                        sums = duplicate_records.groupby('post_id')[numeric_cols].sum()
+                        
+                        # 更新原始数据中的数值
+                        for post_id in sums.index:
+                            mask = unique_records['post_id'] == post_id
+                            for col in numeric_cols:
+                                unique_records.loc[mask, col] += sums.loc[post_id, col]
+                    
+                    final_df = unique_records
+                    print(f"合并后的数据行数: {len(final_df)}")
+            
             # 保存处理后的文件
             output_path = os.path.join(PROCESSED_FOLDER, 'processed_data.xlsx')
             final_df.to_excel(output_path, index=False, engine='openpyxl')

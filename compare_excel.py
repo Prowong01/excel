@@ -20,7 +20,7 @@ def compare_excel_files(file1_path, file2_path):
                 raise ValueError(f"缺少必要的列: {col}")
         
         # 获取两个DataFrame中的所有数值列
-        numeric_cols = ['video_views', 'like', 'comment', 'share', 'collect', 'subscribers']
+        numeric_cols = ['video_views']
         available_numeric_cols = [col for col in numeric_cols if col in df1.columns and col in df2.columns]
         
         # 将df1(旧文件)的相关列重命名，以避免合并时的冲突
