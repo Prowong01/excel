@@ -8,7 +8,7 @@ import numpy as np
 
 # 定义主列模板
 MASTER_COLUMNS = [
-    "post_id", "post", "network", "profile", "domestic_overseas_label", "published_date",
+    "post_id", "post", "network", "profile", "domestic_overseas_label", "published_date", "date", # <--在此处添加 "date"
     "video_views", "playthrough_rate", "avg_play_duration", "video_link",
     "like", "comment", "share", "collect", "subscribers"
 ]
@@ -31,18 +31,33 @@ PLATFORM_MAPPING = {
 # 增强版列名映射
 COLUMN_MAPPING = {
     # 中文映射
+    "视频ID": "post_id",
     "作品名称": "post",
+    "作品": "post",
+    "笔记标题": "post",
     "账号": "profile",
     "发布时间": "published_date",
+    "首次发布时间": "published_date",
     "播放量": "video_views",
+    "观看量": "video_views",
     "完播率": "playthrough_rate",
     "平均播放时长": "avg_play_duration",
+    "人均观看时长": "avg_play_duration",
     "点赞量": "like",
+    "点赞": "like",
     "喜欢量": "like",
+    "喜欢": "like",
     "评论量": "comment",
+    "评论": "comment",
     "分享量": "share",
+    "分享": "share",
+    "推荐": "share",
     "收藏量": "collect",
+    "收藏": "collect",
     "粉丝增量": "subscribers",
+    "涨粉量": "subscribers",
+    "涨粉": "subscribers",
+    "关注量": "subscribers",
 
     # 英文映射
     "post_id": "post_id",
@@ -88,12 +103,12 @@ def determine_game_label(post):
     
     # 使用字典存储游戏关键词及对应的标签
     game_rules = {
-        "Poe2": ["poe", "流放之路", "流放", "pathofexile"],
+        "poe2": ["poe", "流放之路", "流放", "pathofexile", "path of exile"],
         "PUBG": ["pubg", "吃鸡", "绝地求生", "和平精英","游戏小剧场"],
         "Warframe": ["warframe", "星际战甲"],
         "P2": ["exoborne"],
         "Dyinglight": ["消逝的光芒", "消光", "拉万", "lawan", "克兰", "clane", "消失的光芒", "dyinglight", "dying light"],
-        "Nikke": ["nikke", "妮姬"],
+        "Nikke": ["nikke", "妮姬", "胜利女神"],
         "英雄联盟": ["leagueoflegends", "lol", "英雄联盟"],
         "王者荣耀": ["王者荣耀", "hok", "honor of kings", "honorofkings"],
         "暗区突围": ["暗区突围"],
@@ -122,6 +137,15 @@ def determine_game_label(post):
     return "others"
 
 def process_excel(file_path):
+    """
+    处理单个Excel或CSV文件，进行数据清洗、转换和标准化。
+
+    Args:
+        file_path (str): 输入文件的路径。
+
+    Returns:
+        pandas.DataFrame or None: 处理后的DataFrame，如果处理失败则返回None。
+    """
     try:
         filename = os.path.basename(file_path)
         is_foreign = is_foreign_file(filename)
@@ -351,6 +375,18 @@ def process_excel(file_path):
 
             df['published_date'] = df['published_date'].apply(convert_date)
             print("统一 published_date 格式完成")
+
+        # 新增：根据 published_date 创建 date 列
+        if 'published_date' in df.columns:
+            df['date'] = df['published_date'].apply(
+                lambda x: str(x).split('_')[0] if pd.notna(x) and '_' in str(x) else (str(x).split(' ')[0] if pd.notna(x) and ' ' in str(x) else (str(x) if pd.notna(x) else pd.NA))
+            )
+            # 再次尝试转换为标准日期格式 YYYY-MM-DD，以防原始数据只有日期
+            df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+        else:
+            print("警告: 缺少 published_date 列，无法创建 date 列")
+            df['date'] = pd.NA
+
 
         # 填充缺失列
         for col in MASTER_COLUMNS:

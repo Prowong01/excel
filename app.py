@@ -216,7 +216,7 @@ def download_comparison(timestamp):
     return jsonify({'error': '比较结果文件不存在'}), 404
 
 def start_server():
-    app.run(port=5000, debug=False)
+    app.run(port=5001, debug=False)
 
 def main():
     t = threading.Thread(target=start_server)
@@ -225,7 +225,7 @@ def main():
     
     webview.create_window(
         'Excel 处理工具', 
-        'http://localhost:5000',
+        'http://localhost:5001',
         width=800,
         height=600,
         resizable=True
