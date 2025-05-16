@@ -69,11 +69,16 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
           
+      - name: Clean build directories
+        run: |
+          rm -rf build dist
+          
       - name: Build with PyInstaller
         env:
           DYLD_LIBRARY_PATH: /usr/local/opt/gettext/lib
         run: |
-          pyinstaller --clean \
+          # 构建普通可执行文件
+          pyinstaller --clean -y \
             --add-data "templates:templates" \
             --add-data "static:static" \
             --hidden-import webview \
@@ -85,8 +90,9 @@ jobs:
             --onefile \
             app.py
           
-          # 构建 .app 包
-          pyinstaller --clean \
+          # 清理目录后构建 .app 包
+          rm -rf build dist
+          pyinstaller --clean -y \
             --add-data "templates:templates" \
             --add-data "static:static" \
             --hidden-import webview \
@@ -100,15 +106,14 @@ jobs:
             
       - name: Prepare artifacts
         run: |
-          # 创建发布目录
           mkdir -p release
-          # 复制可执行文件
-          cp "dist/Excel处理工具" "release/Excel处理工具"
-          # 复制 .app 包
-          cp -r "dist/Excel处理工具.app" "release/"
+          # 复制可执行文件（如果存在）
+          [ -f "dist/Excel处理工具" ] && cp "dist/Excel处理工具" "release/Excel处理工具"
+          # 复制 .app 包（如果存在）
+          [ -d "dist/Excel处理工具.app" ] && cp -r "dist/Excel处理工具.app" "release/"
           # 设置权限
-          chmod +x "release/Excel处理工具"
-          chmod -R +x "release/Excel处理工具.app"
+          [ -f "release/Excel处理工具" ] && chmod +x "release/Excel处理工具"
+          [ -d "release/Excel处理工具.app" ] && chmod -R +x "release/Excel处理工具.app"
             
       - name: Upload artifact
         uses: actions/upload-artifact@v4
