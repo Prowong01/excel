@@ -84,17 +84,36 @@ jobs:
             --noconsole \
             --onefile \
             app.py
+          
+          # 构建 .app 包
+          pyinstaller --clean \
+            --add-data "templates:templates" \
+            --add-data "static:static" \
+            --hidden-import webview \
+            --hidden-import pandas \
+            --hidden-import openpyxl \
+            --hidden-import numpy \
+            --name "Excel处理工具" \
+            --noconsole \
+            --windowed \
+            app.py
             
-      - name: Create DMG
+      - name: Prepare artifacts
         run: |
-          mkdir -p dist/dmg
-          mv "dist/Excel处理工具" "dist/dmg/Excel处理工具.app"
-          chmod +x "dist/dmg/Excel处理工具.app"
-          hdiutil create -volname "Excel处理工具" -srcfolder dist/dmg -ov -format UDZO "dist/Excel处理工具.dmg"
+          # 创建发布目录
+          mkdir -p release
+          # 复制可执行文件
+          cp "dist/Excel处理工具" "release/Excel处理工具"
+          # 复制 .app 包
+          cp -r "dist/Excel处理工具.app" "release/"
+          # 设置权限
+          chmod +x "release/Excel处理工具"
+          chmod -R +x "release/Excel处理工具.app"
             
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: excel-processor-macos
           path: |
-            dist/Excel处理工具.dmg
+            release/Excel处理工具
+            release/Excel处理工具.app
