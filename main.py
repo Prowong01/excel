@@ -31,15 +31,18 @@ PLATFORM_MAPPING = {
 # 增强版列名映射
 COLUMN_MAPPING = {
     # 中文映射
-    "视频ID": "post_id",
+    "视频id": "post_id",
     "作品名称": "post",
     "作品": "post",
     "笔记标题": "post",
+    "视频标题": "post",
+    "视频描述": "post",
     "账号": "profile",
     "发布时间": "published_date",
     "首次发布时间": "published_date",
     "播放量": "video_views",
     "观看量": "video_views",
+    "阅读（播放）": "video_views",
     "完播率": "playthrough_rate",
     "平均播放时长": "avg_play_duration",
     "人均观看时长": "avg_play_duration",
@@ -139,6 +142,7 @@ def determine_game_label(post):
 def process_excel(file_path):
     """
     处理单个Excel或CSV文件，进行数据清洗、转换和标准化。
+    支持表头在非第一行的情况。
 
     Args:
         file_path (str): 输入文件的路径。
@@ -150,8 +154,45 @@ def process_excel(file_path):
         filename = os.path.basename(file_path)
         is_foreign = is_foreign_file(filename)
         
-        # 读取Excel文件
-        df = pd.read_excel(file_path) if file_path.endswith('.xlsx') else pd.read_csv(file_path, encoding='utf-8')
+        # 读取前几行来确定表头位置
+        if file_path.endswith('.xlsx'):
+            # 先不指定header，读取前5行
+            df_head = pd.read_excel(file_path, nrows=5, header=None)
+        else:
+            encodings = ['utf-8', 'gbk', 'gb2312', 'utf-16']
+            df_head = None
+            for encoding in encodings:
+                try:
+                    df_head = pd.read_csv(file_path, nrows=5, header=None, encoding=encoding)
+                    print(f"成功使用 {encoding} 编码读取CSV文件")
+                    break
+                except Exception as e:
+                    continue
+            if df_head is None:
+                raise Exception("无法使用任何编码方式读取CSV文件")
+
+        # 确定真正的表头行
+        header_row = 0
+        max_matches = 0
+        
+        # 检查前5行，看哪一行与COLUMN_MAPPING的键匹配度最高
+        for i in range(min(5, len(df_head))):
+            # 将该行的值转换为字符串并清理
+            row_values = [str(x).strip() if pd.notna(x) else '' for x in df_head.iloc[i]]
+            current_matches = sum(1 for col in row_values if col in COLUMN_MAPPING)
+            print(f"第 {i+1} 行匹配的列数: {current_matches}")
+            if current_matches > max_matches:
+                max_matches = current_matches
+                header_row = i
+
+        print(f"使用第 {header_row + 1} 行作为表头")
+        
+        # 使用确定的表头行重新读取文件
+        if file_path.endswith('.xlsx'):
+            df = pd.read_excel(file_path, header=header_row)
+        else:
+            df = pd.read_csv(file_path, encoding=encoding, header=header_row)
+        
         print(f"成功读取文件，行数: {len(df)}")
         
         # 打印列名用于调试
@@ -200,7 +241,38 @@ def process_excel(file_path):
         for col in ['post', 'profile', 'published_date']:
             if col not in df.columns:
                 print(f"警告: 缺少关键列 '{col}'")
-                df[col] = "未知" + col  # 添加默认列
+                if col == 'profile':
+                    # 尝试从文件名中提取 profile
+                    try:
+                        # 移除文件扩展名
+                        filename_without_ext = os.path.splitext(filename)[0]
+                        # 查找并提取 profile
+                        for platform in PLATFORM_MAPPING.keys():
+                            if platform in filename_without_ext:
+                                # 找到平台名称在文件名中的位置
+                                platform_index = filename_without_ext.find(platform)
+                                # 从平台名称后的第一个'-'开始截取
+                                remaining = filename_without_ext[platform_index + len(platform):]
+                                if remaining.startswith('-'):
+                                    # 去掉开头的'-'并获取剩余部分作为profile
+                                    profile_name = remaining[1:].strip()
+                                    df[col] = profile_name
+                                    print(f"从文件名成功提取 profile: {profile_name}")
+                                    break
+                        else:
+                            # 如果没有找到平台标识，直接尝试获取最后一部分
+                            if '-' in filename_without_ext:
+                                profile_name = filename_without_ext.split('-')[-1].strip()
+                                df[col] = profile_name
+                                print(f"从文件名提取 profile（无平台标识）: {profile_name}")
+                            else:
+                                df[col] = "未知" + col
+                                print("无法从文件名提取 profile")
+                    except Exception as e:
+                        print(f"从文件名提取 profile 时出错: {str(e)}")
+                        df[col] = "未知" + col
+                else:
+                    df[col] = "未知" + col  # 添加默认列
         
         # 先处理 published_date 格式
         if 'published_date' in df.columns:
@@ -260,20 +332,14 @@ def process_excel(file_path):
 
         df['post'] = df['post'].apply(clean_post)
 
-        # 处理post_id
-        if is_foreign:
-            # 强制小写匹配列名
-            df.columns = df.columns.str.lower()
-            
-            # 检查post_id是否存在（兼容多格式）
-            post_id_cols = [c for c in df.columns if 'post_id' in c]
-            if post_id_cols:
-                print("国外数据：使用原始post_id")
-                df['post_id'] = df[post_id_cols[0]].astype(str).str.strip()
-            else:
-                print("警告：国外数据缺少post_id列，将自动生成")
+        # 处理post_id        
+        # 检查post_id是否存在（包括模糊匹配）
+        post_id_cols = [c for c in df.columns if 'post_id' in c]
+        if post_id_cols:
+            # 如果找到post_id列，直接使用第一个匹配的列
+            print(f"使用已有的post_id列: {post_id_cols[0]}")
+            df['post_id'] = df[post_id_cols[0]].astype(str).str.strip()
         else:
-            # 否则生成post_id
             print("生成post_id")
             post_ids = []
             for idx, row in df.iterrows():
@@ -513,8 +579,8 @@ def main():
         
         # 获取所有需要处理的文件（同时支持.xlsx和.csv）
         excel_files = [f for f in os.listdir(EXCEL_DIR) 
-                     if (f.endswith(".xlsx") or f.endswith(".csv")) 
-                     and not f.startswith("merged_")]
+                    if (f.endswith(".xlsx") or f.endswith(".csv")) 
+                    and not f.startswith("merged_")]
         
         print(f"找到{len(excel_files)}个文件需要处理: {excel_files}")
         
