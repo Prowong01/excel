@@ -479,13 +479,26 @@ def process_excel(file_path):
         df = df.reindex(columns=MASTER_COLUMNS)
         
         # 数据类型转换
+        # 处理数值列
         numeric_columns = ['like', 'comment', 'share', 'collect', 'subscribers', 'video_views']
         for col in numeric_columns:
             if col in df.columns:
                 try:
+                    # 1. 先将列转换为字符串
+                    df[col] = df[col].astype(str)
+                    
+                    # 2. 清理千位分隔符和其他非数字字符（保留小数点）
+                    df[col] = df[col].str.replace(',', '').str.replace('，', '')
+                    df[col] = df[col].str.extract('([-+]?\d*\.?\d+)', expand=False)
+                    
+                    # 3. 转换为数值类型
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('int64')
+                    
+                    # 4. 打印一些调试信息
+                    print(f"处理 {col} 列完成，最大值: {df[col].max()}, 最小值: {df[col].min()}")
                 except Exception as e:
-                    print(f"转换列 {col} 时出错: {str(e)}")
+                    print(f"处理 {col} 列时出错: {str(e)}")
+                    continue
         
         # 注意：根据要求，不再转换playthrough_rate，保留原始数据
         # 只进行基础类型处理，确保是字符串或数值类型
