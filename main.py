@@ -140,24 +140,18 @@ def determine_game_label(post):
     return "others"
 
 def process_excel(file_path):
-    """
-    处理单个Excel或CSV文件，进行数据清洗、转换和标准化。
-    支持表头在非第一行的情况。
-
-    Args:
-        file_path (str): 输入文件的路径。
-
-    Returns:
-        pandas.DataFrame or None: 处理后的DataFrame，如果处理失败则返回None。
-    """
     try:
         filename = os.path.basename(file_path)
         is_foreign = is_foreign_file(filename)
         
         # 读取前几行来确定表头位置
         if file_path.endswith('.xlsx'):
-            # 先不指定header，读取前5行
+            # 对于 .xlsx 文件使用默认引擎
             df_head = pd.read_excel(file_path, nrows=5, header=None)
+        elif file_path.endswith('.xls'):
+            # 对于 .xls 文件显式指定 xlrd 引擎
+            print('xls 文件')
+            df_head = pd.read_excel(file_path, nrows=5, header=None, engine='xlrd')
         else:
             encodings = ['utf-8', 'gbk', 'gb2312', 'utf-16']
             df_head = None
@@ -169,7 +163,9 @@ def process_excel(file_path):
                 except Exception as e:
                     continue
             if df_head is None:
-                raise Exception("无法使用任何编码方式读取CSV文件")
+                # 如果是其他不支持的文件类型，可以在这里抛出或记录错误
+                print(f"警告: 文件 {filename} 不是支持的Excel或CSV格式，跳过处理。")
+                return None # 或者 raise Exception("不支持的文件类型")
 
         # 确定真正的表头行
         header_row = 0
@@ -190,8 +186,27 @@ def process_excel(file_path):
         # 使用确定的表头行重新读取文件
         if file_path.endswith('.xlsx'):
             df = pd.read_excel(file_path, header=header_row)
-        else:
-            df = pd.read_csv(file_path, encoding=encoding, header=header_row)
+        elif file_path.endswith('.xls'):
+            df = pd.read_excel(file_path, header=header_row, engine='xlrd')
+        else: # 假设其他情况为CSV文件 (这里需要确保 encoding 变量在 df_head 读取时已正确设置)
+            # 确保 encoding 变量在此处可用
+            # 如果 df_head 读取失败，encoding 可能未定义
+            # 为了安全，可以再次尝试获取 encoding 或在 df_head 读取失败时就返回
+            if df_head is None: # 再次检查，如果上面返回了None，这里理论上不会执行
+                print(f"无法读取文件头部: {filename}, 跳过。")
+                return None
+
+            # 尝试找到用于读取df_head的encoding，如果之前没有成功读取，则encoding可能未定义
+            # 为了稳妥，这里可以重新执行一遍CSV的encoding尝试，或者确保encoding在上面成功设置
+            # 假设encoding已在上面正确设置
+            try:
+                df = pd.read_csv(file_path, encoding=encoding, header=header_row)
+            except NameError: # 如果encoding未定义 (例如，如果文件不是.xlsx, .xls, 也不是有效的CSV)
+                 print(f"无法确定CSV文件的编码: {filename}, 跳过。")
+                 return None
+            except Exception as e:
+                print(f"使用编码 {encoding} 读取CSV文件 {filename} 时出错: {e}")
+                return None
         
         print(f"成功读取文件，行数: {len(df)}")
         
